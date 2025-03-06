@@ -1,7 +1,7 @@
 #!/bin/bash
 # setting
-SLIDE_FOLDER="/home/zhilong/dr_pusher/Projects/GrandQC/additional_step_geojson/test_ome/"
-OUTPUT_DIR="/home/zhilong/dr_pusher/Projects/GrandQC/additional_step_geojson/test_output/"
+SLIDE_FOLDER="/path/to/the/slides/"
+OUTPUT_DIR="/path/to/the/output/"
 QC_MPP_MODEL=1.5
 CREATE_GEOJSON="Y"
 
