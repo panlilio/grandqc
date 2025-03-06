@@ -65,6 +65,10 @@ The main branch works with **PyTorch 2+**.
 
 </details>
 
+### UPDATE
+
+- **06.03.2025:** A new function has been added for generating GeoJSON files, refer to the section [How to run the scripts](#how-to-run-the-scripts)
+
 ### Model selection
 
 To balance accuracy and inference efficiency, we have trained three different models based on three magnifications (5x, 7x, and 10x). As the magnification decreases, the inference speed increases, but accuracy may be slightly affected. 
@@ -153,19 +157,17 @@ grandqc
 
 The default version is 7x (Checkpoint: GrandQC_MPP15.pth)
 
-To use 5x and 10x checkpoints, the `main.py` script should be modified.
+To use 5x and 10x checkpoints, the `run_art.sh` script should be modified.
 
 For 5x, use:
 
 ```commandline
-MODEL_QC_NAME = 'GrandQC_MPP2.pth'
-MPP_MODEL = 2
+QC_MPP_MODEL=2.0
 ```
 For 10x, use:
 
 ```commandline
-MODEL_QC_NAME = 'GrandQC_MPP1.pth'
-MPP_MODEL = 1
+QC_MPP_MODEL=1.0
 ```
 ## How to run the scripts
 
@@ -186,7 +188,7 @@ sh run_tis.sh
 
 - Artifacts Segmentation
 
-Similar to the Tissue Segmentation, before running the Artifacts-Segmentation script, you need to define the slides path **SLIDE_FOLDER** and **OUTPUT_DIR** in `run_art.sh` first and then run:
+Similar to the Tissue Segmentation, before running the Artifacts-Segmentation script, you need to define the slides path **SLIDE_FOLDER** and **OUTPUT_DIR** in `run_art.sh` first, if you want to create `Geojson` file, make sure that `CREATE_GEOJSON="Y"` in `run_art.sh` and then run:
 
 ```commandline
 sh run_art.sh
