@@ -4,6 +4,9 @@ from PIL import Image
 import segmentation_models_pytorch as smp
 import torch
 from tqdm import tqdm
+import cv2
+import json
+
 
 #Helper functions
 def to_tensor_x(x, **kwargs):
@@ -113,3 +116,94 @@ def slide_process_single(model, tis_det_map_mpp, slide, patch_n_w_l0, patch_n_h_
     end_image_1class = end_image_1class.resize((patch_n_w_l0*200, patch_n_h_l0*200), Image.Resampling.LANCZOS) #what is 50 here?
 
     return end_image_1class, end_image
+
+def mask_to_geojson(mask_path, output_path, scale_factor=1.0):
+    """
+    Convert a semantic segmentation mask to GeoJSON with coordinate scaling
+
+    Parameters:
+    -----------
+    mask_path : str
+        Path to the input PNG mask file
+    output_path : str
+        Path to save the output GeoJSON file
+    scale_factor : float, optional, should be: model_mpp / slide_mpp
+        Factor to scale coordinates by (default: 1.0)
+
+    Returns:
+    --------
+    None
+    """
+    # Define class mapping
+    CLASS_MAPPING = {
+        1: "Normal Tissue",
+        2: "Fold",
+        3: "Darkspot & Foreign Object",
+        4: "PenMarking",
+        5: "Edge & Air Bubble",
+        6: "OOF",  # Out of Focus
+        7: "Background"
+    }
+
+    # Read the mask image
+    mask = cv2.imread(mask_path, cv2.IMREAD_UNCHANGED)
+
+    # Dictionary to store features for each class
+    features = []
+
+    # Iterate through unique class values (1 to 7)
+    for class_value in range(2, 7):
+        # Create a binary mask for the current class
+        class_mask = (mask == class_value).astype(np.uint8) * 255
+
+        # Find contours
+        contours, _ = cv2.findContours(class_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        # Convert contours to GeoJSON features
+        for contour in contours:
+            # Flatten contour and reshape
+            contour_points = contour.reshape(-1, 2)
+
+            # Scale coordinates
+            scaled_points = contour_points * scale_factor
+
+            # Skip contours with less than 4 points
+            if len(scaled_points) < 4:
+                # print(f"Skipping contour with {len(scaled_points)} points for class {class_value}")
+                continue
+
+            # Ensure polygon is closed by adding first point at the end if needed
+            polygon_points = scaled_points.tolist()
+            if not np.array_equal(polygon_points[0], polygon_points[-1]):
+                polygon_points.append(polygon_points[0])
+
+            # Create feature for this polygon
+            feature = {
+                "type": "Feature",
+                "properties": {
+                    "class_id": int(class_value),
+                    "classification": CLASS_MAPPING.get(class_value, "Unknown"),
+                    "area": cv2.contourArea(contour) * (scale_factor ** 2)
+                },
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [polygon_points]
+                }
+            }
+
+            features.append(feature)
+
+    # Create GeoJSON structure
+    geojson = {
+        "type": "FeatureCollection",
+        "features": features,
+        "metadata": {
+            "class_mapping": CLASS_MAPPING,
+            "scale_factor": scale_factor
+        }
+    }
+
+    # Write to file
+    with open(output_path, 'w') as f:
+        json.dump(geojson, f, indent=2)
+

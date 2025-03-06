@@ -19,7 +19,7 @@ DEVICE = 'cuda'
 # MODEL(S)
 # MODEL TISSUE DETECTION:
 MODEL_TD_DIR = './models/td/'
-MODEL_TD_NAME = 'Tissue_Detection_MPP15.pth'
+MODEL_TD_NAME = 'Tissue_Detection_MPP10.pth'
 MPP_MODEL_TD = 10
 M_P_S_MODEL_TD = 512
 ENCODER_MODEL_TD = 'timm-efficientnet-b0'
@@ -166,7 +166,7 @@ for slide_name in slide_names:
         overlay = Image.fromarray(overlay)
         overlay.save(os.path.join(tis_det_dir_over, slide_name + '_OVERLAY.jpg'))
         slide_tiff.close()
-    except:
+    except Exception as e:
         print('Problem with a file:', slide_name)
 
 

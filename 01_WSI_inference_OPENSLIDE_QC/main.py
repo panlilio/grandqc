@@ -10,7 +10,7 @@ from openslide import open_slide
 from PIL import Image
 import os
 from wsi_slide_info import slide_info
-from wsi_process import slide_process_single
+from wsi_process import slide_process_single, mask_to_geojson
 from wsi_maps import make_overlay
 import numpy as np
 import timeit
@@ -25,10 +25,38 @@ DEVICE = 'cuda'
 'mps'    - APPLE Silicon
 '''
 
+# Input parameter
+parser = argparse.ArgumentParser()
+parser.add_argument('--slide_folder', dest='slide_folder', help='path to WSIs', type=str)
+parser.add_argument('--output_dir', dest='output_dir', help='path to output folder', type=str)
+parser.add_argument('--create_geojson', dest='create_geojson', help='create geojson for QC or not', default="Y", type=str)
+parser.add_argument('--start', dest='start', default=0,  help='start num of WSIs', type=int)
+parser.add_argument('--mpp_model', dest='MPP_MODEL', default=1.5,
+                    help='MPP of the training model, should only be 1.0, 1.5, 2.0', type=float)
+parser.add_argument('--end', dest='end', default=-1, help='end num of WSIs', type=int)
+parser.add_argument('--ol_factor', dest='ol_factor', default=10,
+                    help='reduction factor of the overlay compared to dimensions of original WSI', type=int)
+
+args = parser.parse_args()
+
+MPP_MODEL = args.MPP_MODEL
+start = args.start
+end = args.end
+create_geojson = args.create_geojson
+SLIDE_DIR = args.slide_folder
+OUTPUT_DIR = args.output_dir
+OVERLAY_FACTOR = args.ol_factor
+
 # MODEL(S)
 MODEL_QC_DIR = './models/qc/'
-MODEL_QC_NAME = 'GrandQC_MPP15.pth'
-MPP_MODEL = 1.5
+if MPP_MODEL == 1.5:
+    MODEL_QC_NAME = 'GrandQC_MPP15.pth'
+elif MPP_MODEL == 1.0:
+    MODEL_QC_NAME = 'GrandQC_MPP1.pth'
+elif MPP_MODEL == 2.0:
+    MODEL_QC_NAME = 'GrandQC_MPP2.pth'
+else:
+    raise Exception("mpp of the model can only be 1.0, 1.5, 2.0")
 M_P_S_MODEL = 512
 ENCODER_MODEL = 'timm-efficientnet-b0'
 ENCODER_MODEL_WEIGHTS = 'imagenet'
@@ -36,24 +64,12 @@ ENCODER_MODEL_WEIGHTS = 'imagenet'
 # CLASSES
 BACK_CLASS = 7
 
-parser = argparse.ArgumentParser()
-parser.add_argument('--slide_folder', dest='slide_folder', help='path to WSIs', type=str)
-parser.add_argument('--output_dir', dest='output_dir', help='path to output folder', type=str)
-parser.add_argument('--start', dest='start', default=0,  help='start num of WSIs', type=int)
-parser.add_argument('--end', dest='end', default=-1, help='end num of WSIs', type=int)
-parser.add_argument('--ol_factor', dest='ol_factor', default=10,
-                    help='reduction factor of the overlay compared to dimensions of original WSI', type=int)
-
-args = parser.parse_args()
-
-start = args.start
-end = args.end
-SLIDE_DIR = args.slide_folder
-OUTPUT_DIR = args.output_dir
-OVERLAY_FACTOR = args.ol_factor
-
 if end == -1:
     end = len(os.listdir(SLIDE_DIR))
+
+if create_geojson == "Y":
+    geojson_root = os.path.join(OUTPUT_DIR, "geojson_qc")
+    os.makedirs(geojson_root, exist_ok=True)
 
 case_name = os.path.basename(OUTPUT_DIR)
 REPORT_FILE_NAME = f'report_{case_name}_' + str(start) + '_' + str(end)     # File name, ".txt" will be added in the end
@@ -137,6 +153,10 @@ for slide_name in slide_names[start:end]:
 
         mask_path = os.path.join(mask_dir, slide_name + "_mask.png")
         cv2.imwrite(mask_path, full_mask)
+        if create_geojson == "Y":
+            geojson_path = os.path.join(geojson_root, slide_name + '.geojson')
+            factor = MPP_MODEL / mpp
+            mask_to_geojson(mask_path, geojson_path, factor)
 
         del full_mask
 

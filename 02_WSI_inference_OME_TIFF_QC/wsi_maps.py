@@ -5,7 +5,6 @@ import cv2
 
 # MAKE OVERLAY: HEATMAP ON REDUCED AND CROPPED SLIDE CLON
 def make_overlay(slide, wsi_heatmap_im, p_s, patch_n_w_l0, patch_n_h_l0, overlay_factor):
-    print('started')
     _, h_l0, w_l0 = slide [0].shape
 
     image_or = np.array(slide[1])
