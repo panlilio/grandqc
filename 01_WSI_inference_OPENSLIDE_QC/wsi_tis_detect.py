@@ -7,7 +7,7 @@ import argparse
 from PIL import Image
 import segmentation_models_pytorch as smp
 from wsi_tis_detect_helper_fx import get_preprocessing, make_class_map
-
+from fic_parser import fic_parser
 
 # DEVICE
 DEVICE = 'cuda'
@@ -35,10 +35,12 @@ colors = [[50, 50, 250],    # BLUE: TISSUE
 parser = argparse.ArgumentParser()
 parser.add_argument('--slide_folder', dest='slide_folder', help='path to WSIs', type=str)
 parser.add_argument('--output_dir', dest='output_dir', help='path to output folder', type=str)
+parser.add_argument('--fic_dir', dest='fic_dir', help='path to FIC folder', type=str, default=None)
 args = parser.parse_args()
 
 SLIDE_DIR = args.slide_folder
 OUTPUT_DIR = args.output_dir
+FIC_DIR = args.fic_dir
 
 # Create output dirs
 tis_det_dir_mask = os.path.join(OUTPUT_DIR, 'tis_det_mask/')
@@ -72,6 +74,9 @@ model.eval()
 
 # Start analysis loop
 for slide_name in slide_names:
+    if slide_name.split('.')[-1].lower() in ['identifier','fic']:
+        continue
+
     print("")
     print("Working with: ", slide_name)
     try:
@@ -79,7 +84,28 @@ for slide_name in slide_names:
         slide = OpenSlide(path_slide)
 
         w_l0, h_l0 = slide.level_dimensions[0]
-        mpp = round(float(slide.properties["openslide.mpp-x"]), 4)
+        if "openslide.mpp-x" in slide.properties:
+            mpp = round(float(slide.properties["openslide.mpp-x"]), 4)
+        elif args.fic_dir is not None:
+            matches = []
+            for fic_name in os.listdir(args.fic_dir):
+                if fic_name[-4:] == '.fic':
+                    k = next((i for i, (a,b) in enumerate(zip(slide_name,fic_name)) if a != b), None)
+                    if k is not None and k > 0:
+                        matches.append((fic_name, k))
+            if len(matches) > 0:
+                k = max([m[1] for m in matches])
+                fic_name = [m[0] for m in matches if m[1] == k][0]
+                fic_path = os.path.join(FIC_DIR, fic_name)
+                print("Matching FIC file found:", fic_path)
+                mpp = fic_parser(fic_path)
+            else:
+                print("No matching FIC file found. Assuming mpp = 0.25")
+                mpp = 0.25
+        else:
+            print("No metadata of microns per pixel found. Assuming mpp = 0.25")
+            mpp = 0.25
+        
         reduction_factor = MPP_MODEL_TD / mpp
 
         image_or = slide.get_thumbnail((w_l0 // reduction_factor, h_l0 // reduction_factor))

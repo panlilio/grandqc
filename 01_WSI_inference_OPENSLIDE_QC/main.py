@@ -19,7 +19,7 @@ Image.MAX_IMAGE_PIXELS = 1000000000
 
 
 # DEVICE
-DEVICE = 'cuda'
+DEVICE = 'cuda:0'
 '''
 'cuda:0' - NVIDIA GPU card
 'mps'    - APPLE Silicon
@@ -29,6 +29,7 @@ DEVICE = 'cuda'
 parser = argparse.ArgumentParser()
 parser.add_argument('--slide_folder', dest='slide_folder', help='path to WSIs', type=str)
 parser.add_argument('--output_dir', dest='output_dir', help='path to output folder', type=str)
+parser.add_argument('--fic_dir', dest='fic_dir', help='path to FIC folder', type=str, default=None)
 parser.add_argument('--create_geojson', dest='create_geojson', help='create geojson for QC or not', default="Y", type=str)
 parser.add_argument('--start', dest='start', default=0,  help='start num of WSIs', type=int)
 parser.add_argument('--mpp_model', dest='MPP_MODEL', default=1.5,
@@ -45,6 +46,7 @@ end = args.end
 create_geojson = args.create_geojson
 SLIDE_DIR = args.slide_folder
 OUTPUT_DIR = args.output_dir
+FIC_DIR = args.fic_dir
 OVERLAY_FACTOR = args.ol_factor
 
 # MODEL(S)
@@ -117,7 +119,11 @@ slide_names = sorted(os.listdir(SLIDE_DIR))
 # Start analysis loop
 
 for slide_name in slide_names[start:end]:
-    try:
+    if slide_name.split(".")[-1].lower() not in ['svs', 'tif', 'tiff', 'ndpi', 'vms', 'vmu', 'mrxs']:
+        continue
+
+    else:
+#    try:
         # Register start time
         start = timeit.default_timer()
 
@@ -129,10 +135,11 @@ for slide_name in slide_names[start:end]:
         slide = open_slide(path_slide)
 
         # GET SLIDE INFO
-        p_s, patch_n_w_l0, patch_n_h_l0, mpp, w_l0, h_l0, obj_power = slide_info(slide, M_P_S_MODEL, MPP_MODEL)
+        p_s, patch_n_w_l0, patch_n_h_l0, mpp, w_l0, h_l0, obj_power = slide_info(slide, M_P_S_MODEL, MPP_MODEL, FIC_DIR, slide_name)
 
         # LOAD TISSUE DETECTION MAP
         tis_det_map = Image.open(os.path.join(OUTPUT_DIR, 'tis_det_mask', slide_name + '_MASK.png'))
+        print("Tissue detection map opened")
         '''
         Tissue detection map is generated on MPP = 10
         This map is used for on-fly control of the necessity of model inference.
@@ -188,5 +195,5 @@ for slide_name in slide_names[start:end]:
         results = open(path_result, "a+")
         results.write(output_temp)
         results.close()
-    except Exception as e:
-        print(f"There was some problem with the slide. The error is: {e}")
+ #   except Exception as e:
+ #       print(f"There was some problem with the slide. The error is: {e}")
